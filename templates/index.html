@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Overview · AEGIS AI{% endblock %}
+{% block page_title %}Overview{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>Security Overview</h1>
+    <p class="muted" style="margin:0">Findings and trends from your authorized assessments</p>
+  </div>
+  <div class="actions">
+    <a class="btn ghost" href="{{ url_for('main.surface_latest') }}">3D attack surface</a>
+    <a class="btn" href="{{ url_for('main.assessments') }}">+ New assessment</a>
+  </div>
+</div>
+
+{% if not latest %}
+<div class="card empty">
+  <h2 style="margin-bottom:8px; color:var(--text)">No completed assessments yet</h2>
+  <p>Run your first scan and the charts will appear here.</p>
+  <a class="btn" href="{{ url_for('main.assessments') }}">Start an assessment</a>
+</div>
+{% else %}
+
+<div class="dash-top">
+  <!-- Findings summary -->
+  <div class="card">
+    <div class="card-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+      <h2>Findings Summary</h2><span class="chip">Latest · #{{ latest.id }}</span>
+    </div>
+    <p class="card-sub">Priority breakdown for {{ latest.target }}</p>
+
+    <div class="donut-wrap">
+      <svg viewBox="0 0 200 200" role="img" aria-label="Findings by priority, {{ donut.total }} in total">
+        <circle cx="100" cy="100" r="{{ donut.r }}" fill="none" stroke="#14203a" stroke-width="22"/>
+        {% for s in donut.segments %}
+        <circle class="seg" cx="100" cy="100" r="{{ donut.r }}" fill="none" stroke="{{ s.color }}" stroke-width="22"
+                stroke-dasharray="{{ s.dash }}" stroke-dashoffset="{{ s.offset }}" tabindex="0"
+                aria-label="{{ s.label }}: {{ s.count }}"
+                data-tip-title="{{ s.label }}" data-tip-value="{{ s.count }}" data-tip-color="{{ s.color }}"/>
+        {% endfor %}
+      </svg>
+      <div class="donut-center"><span class="hero">{{ donut.total }}</span><span class="cap">Total findings</span></div>
+    </div>
+
+    <div class="legend-rows">
+      {% for l in legend %}
+      <div class="legend-row"><i style="background:{{ l.color }}"></i>{{ l.label }}<b>{{ l.count }}</b></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Trend -->
+  <div class="card">
+    <div class="card-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h6v6"/></svg>
+      <h2>Assessment Trends</h2><span class="chip">{{ trend.n }} assessment{{ '' if trend.n == 1 else 's' }}</span>
+    </div>
+    <p class="card-sub">Findings per completed assessment. Hover to compare.</p>
+    <div class="keys"><span style="--k:var(--series1)">Total findings</span><span style="--k:var(--series2)">Critical + High</span></div>
+
+    <svg class="trend" id="trend-svg" viewBox="0 0 {{ trend.w }} {{ trend.h }}" role="img"
+         aria-label="Line chart of total and critical-plus-high findings per assessment">
+      {% for g in trend.grid %}
+      <line class="{{ 'base-l' if loop.first else 'grid-l' }}" x1="{{ trend.x0 }}" x2="{{ trend.x1 }}" y1="{{ g.y }}" y2="{{ g.y }}"/>
+      <text x="{{ trend.x0 - 10 }}" y="{{ g.y + 4 }}" text-anchor="end">{{ g.label }}</text>
+      {% endfor %}
+      {% for xl in trend.xlabels %}<text x="{{ xl.x }}" y="{{ trend.h - 10 }}" text-anchor="middle">{{ xl.text }}</text>{% endfor %}
+
+      {% if trend.area_total %}
+      <path d="{{ trend.area_total }}" fill="#3987e5" fill-opacity="0.10"/>
+      <path d="{{ trend.line_total }}" fill="none" stroke="#3987e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="{{ trend.line_urgent }}" fill="none" stroke="#d95926" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      {% endif %}
+      <line id="xh" class="xh" x1="0" x2="0" y1="{{ trend.y0 }}" y2="{{ trend.y1 }}" style="display:none"/>
+      {% for p in trend.points %}
+      <circle cx="{{ p.x }}" cy="{{ p.uy }}" r="4" fill="#d95926" stroke="#0a101c" stroke-width="2"/>
+      <circle cx="{{ p.x }}" cy="{{ p.ty }}" r="4" fill="#3987e5" stroke="#0a101c" stroke-width="2"/>
+      {% endfor %}
+      <text x="{{ trend.x1 + 12 }}" y="{{ trend.end_total_y + 4 }}">Total</text>
+      <text x="{{ trend.x1 + 12 }}" y="{{ trend.end_urgent_y + 4 }}">Critical + High</text>
+    </svg>
+    {% if trend.n < 2 %}<p class="muted small" style="margin:8px 0 0">Run more assessments to see how findings change over time.</p>{% endif %}
+
+    <details class="tableview">
+      <summary>View as table</summary>
+      <table>
+        <tr><th>Assessment</th><th>Date</th><th>Total</th><th>Critical + High</th></tr>
+        {% for p in trend.points %}<tr><td>#{{ p.id }}</td><td>{{ p.date }}</td><td>{{ p.total }}</td><td>{{ p.urgent }}</td></tr>{% endfor %}
+      </table>
+    </details>
+    <script type="application/json" id="trend-data">{{ trend.points|tojson }}</script>
+  </div>
+</div>
+
+<div class="dash-mid">
+  <div class="card">
+    <div class="card-head"><h2>Components</h2><span class="chip">URL paths</span></div>
+    <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>{{ components.total }} component{{ '' if components.total == 1 else 's' }}</div>
+    <p class="card-sub">Top 3 components by number of findings</p>
+    {% for b in components.top %}
+    <div class="bar-row" tabindex="0" data-tip-title="{{ b.label }}" data-tip-value="{{ b.count }}">
+      <div class="top"><span>{{ b.label }}</span><strong>{{ b.count }}</strong></div>
+      <div class="track"><span style="width:{{ b.pct }}%"></span></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Finding types</h2><span class="chip">ZAP alerts</span></div>
+    <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>{{ types.total }} type{{ '' if types.total == 1 else 's' }}</div>
+    <p class="card-sub">Top 3 finding types by occurrences</p>
+    {% for b in types.top %}
+    <div class="bar-row" tabindex="0" data-tip-title="{{ b.label }}" data-tip-value="{{ b.count }}">
+      <div class="top"><span>{{ b.label }}</span><strong>{{ b.count }}</strong></div>
+      <div class="track"><span style="width:{{ b.pct }}%"></span></div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>Recent assessments</h2><a class="chip" href="{{ url_for('main.assessments') }}">View all</a></div>
+  <table>
+    <tr><th>#</th><th>Target</th><th>Mode</th><th>Status</th><th>Findings</th><th class="hide-sm">Started (UTC)</th></tr>
+    {% for s in recent %}
+    <tr>
+      <td><a href="{{ url_for('main.scan_detail', scan_id=s.id) }}">#{{ s.id }}</a></td>
+      <td>{{ s.target }}</td><td>{{ s.mode }}</td>
+      <td><span class="badge {{ s.status }}"><span class="dot"></span>{{ s.status }}</span></td>
+      <td>{{ s.finding_count }}</td>
+      <td class="hide-sm muted">{{ s.started_at.replace('T', ' ')[:19] }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="empty">No assessments yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const dataEl = document.getElementById('trend-data'); if (!dataEl) return;
+  const pts = JSON.parse(dataEl.textContent); if (!pts.length) return;
+  const svg = document.getElementById('trend-svg'), xh = document.getElementById('xh'), vb = svg.viewBox.baseVal;
+  function nearest(clientX) {
+    const r = svg.getBoundingClientRect(), x = (clientX - r.left) / r.width * vb.width;
+    return pts.reduce((best, p) => Math.abs(p.x - x) < Math.abs(best.x - x) ? p : best, pts[0]);
+  }
+  svg.addEventListener('pointermove', e => {
+    const p = nearest(e.clientX);
+    xh.setAttribute('x1', p.x); xh.setAttribute('x2', p.x); xh.style.display = '';
+    showTip(e.clientX, e.clientY, p.label, [['Total findings', p.total, '#3987e5'], ['Critical + High', p.urgent, '#d95926']]);
+  });
+  svg.addEventListener('pointerleave', () => { xh.style.display = 'none'; hideTip(); });
+})();
+</script>
+{% endblock %}

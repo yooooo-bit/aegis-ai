@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Settings · AEGIS AI{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>Settings</h1>
+    <p class="muted" style="margin:0">Scanner connection, prioritization, AI analysis and report details</p>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('main.settings') }}" autocomplete="off">
+  <div class="card">
+    <div class="card-head"><h2>Scanner (OWASP ZAP)</h2></div>
+    <p class="card-sub">Only local addresses are accepted, because AEGIS AI is a local lab tool.</p>
+    <div class="form-grid">
+      <div class="field"><label for="zap_url">ZAP address</label>
+        <input type="text" id="zap_url" name="zap_url" value="{{ s.zap_url }}"></div>
+      <div class="field"><label for="zap_api_key">ZAP API key</label>
+        <input type="password" id="zap_api_key" name="zap_api_key" placeholder="unchanged (leave blank to keep the current key)">
+        <div class="hint">Must match the key in docker-compose.yml.</div></div>
+      <div class="field"><label for="max_scan_seconds">Scan time limit (seconds)</label>
+        <input type="number" id="max_scan_seconds" name="max_scan_seconds" min="60" max="3600" value="{{ s.max_scan_seconds }}">
+        <div class="hint">A scan that runs longer than this is stopped. 60 to 3600.</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Prioritization</h2></div>
+    <label class="check" style="margin:0"><input type="checkbox" name="internet_exposed" {{ 'checked' if s.internet_exposed == '1' }}>
+      <span>Treat the target as internet-facing <span class="small">(raises the exposure points in every priority score; leave off for a local lab)</span></span></label>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>AI analysis</h2></div>
+    <p class="card-sub">The built-in rules always work. A local model through Ollama is optional and its output is checked against the scan data.</p>
+    <div class="form-grid">
+      <div class="field"><label for="ai_mode">Analysis mode</label>
+        <select id="ai_mode" name="ai_mode">
+          <option value="rules" {{ 'selected' if s.ai_mode == 'rules' }}>Rules-based knowledge base (no model needed)</option>
+          <option value="ollama" {{ 'selected' if s.ai_mode == 'ollama' }}>Local AI through Ollama (optional)</option>
+        </select></div>
+      <div class="field"><label for="ollama_model">Ollama model</label>
+        <input type="text" id="ollama_model" name="ollama_model" value="{{ s.ollama_model }}">
+        <div class="hint">Install it once with: ollama pull {{ s.ollama_model }}</div></div>
+      <div class="field"><label for="ollama_url">Ollama address</label>
+        <input type="text" id="ollama_url" name="ollama_url" value="{{ s.ollama_url }}"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Report details</h2></div>
+    <p class="card-sub">Shown on the cover of every report.</p>
+    <div class="form-grid">
+      <div class="field"><label for="tester_name">Prepared by</label>
+        <input type="text" id="tester_name" name="tester_name" value="{{ s.tester_name }}" placeholder="Your name"></div>
+      <div class="field"><label for="org_name">Organisation</label>
+        <input type="text" id="org_name" name="org_name" value="{{ s.org_name }}" placeholder="Your college or company"></div>
+    </div>
+  </div>
+
+  <button type="submit">Save settings</button>
+</form>
+
+<div class="card" style="margin-top:24px">
+  <div class="card-head"><h2>Connection tests</h2></div>
+  <p class="card-sub">Tests use the saved settings, so save first.</p>
+  <div class="actions">
+    <form method="post" action="{{ url_for('main.test_zap') }}" style="margin:0"><button type="submit" class="btn ghost">Test ZAP connection</button></form>
+    <form method="post" action="{{ url_for('main.test_ollama') }}" style="margin:0"><button type="submit" class="btn ghost">Test Ollama</button></form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Authorized targets</h2><span class="chip">read-only</span></div>
+  <p class="card-sub">Scans are only allowed against these addresses. This list can only be changed by editing <code>ALLOWED_TARGETS</code> in config.py, on purpose, so that authorizing a target is always a conscious step.</p>
+  {% for t in allowed %}<div class="legend-row" style="margin-bottom:8px"><i style="background:var(--low)"></i>{{ t }}</div>{% endfor %}
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>System</h2></div>
+  <div class="legend-rows">
+    <div class="legend-row">Audit log integrity<b>{{ 'Intact' if chain_ok else 'BROKEN' }}</b></div>
+    <div class="legend-row">PDF export (reportlab)<b>{{ 'Installed' if pdf_ok else 'Not installed' }}</b></div>
+  </div>
+</div>
+{% endblock %}

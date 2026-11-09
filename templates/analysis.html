@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}AI analysis · Scan #{{ scan.id }}{% endblock %}
+{% block page_title %}AI analysis{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('main.assessments') }}">Assessments</a> /
+  <a href="{{ url_for('main.scan_detail', scan_id=scan.id) }}">#{{ scan.id }}</a> / AI analysis</div>
+<div class="pagehead">
+  <div>
+    <h1>AI analysis</h1>
+    <p class="muted" style="margin:0">Plain-language explanations, grouped and ranked for {{ scan.target }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn ghost" href="{{ url_for('main.report_view', scan_id=scan.id) }}">Open report</a>
+    <form method="post" action="{{ url_for('main.analysis_run', scan_id=scan.id) }}" style="margin:0">
+      <button type="submit">{{ 'Run local AI' if ai_mode == 'ollama' else 'Refresh analysis' }}</button>
+    </form>
+  </div>
+</div>
+
+<div class="notice"><strong>How to read this.</strong> Explanations are advisory. Findings come from the scanner, and nothing here confirms
+  that a weakness can be exploited. A local AI model only sees the stored scan data, and any answer that mentions a CVE, CWE or URL that is not in the scan data is rejected.</div>
+
+<div class="card">
+  <div class="card-head"><h2>Analysis engine</h2>
+    <span class="chip">{{ 'Local AI · ' ~ model if ai_mode == 'ollama' else 'Rules-based' }}</span></div>
+  {% if ai_mode == 'ollama' %}
+    <p class="card-sub" style="margin:0">Rules-based text is always generated first. The local model then rewrites each group and replaces the rules text only when its answer passes the checks.</p>
+  {% else %}
+    <p class="card-sub" style="margin:0">Using the built-in knowledge base (no model needed). Turn on <a href="{{ url_for('main.settings') }}">Local AI in Settings</a> if you have Ollama installed.</p>
+  {% endif %}
+  {% if prog %}
+    {% if prog.running %}
+      <p class="small" style="margin:14px 0 6px">Local AI is working: {{ prog.done }} of {{ prog.total or '?' }} groups done.</p>
+      <div class="progress"><span style="width:{{ (prog.done / prog.total * 100)|round if prog.total else 3 }}%"></span></div>
+    {% elif prog.error %}
+      <div class="flash-error" style="margin:14px 0 0">{{ prog.error }}</div>
+    {% else %}
+      <p class="small muted" style="margin:14px 0 0">Local AI finished: {{ prog.done }} groups processed, {{ prog.rejected }} rejected by the checks.</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+{% if cards %}
+<div class="card">
+  <div class="card-head"><h2>Investigate first</h2></div>
+  <p class="card-sub">Top issue types by priority score</p>
+  {% for c in cards[:3] %}
+  <div class="rank"><span class="pill {{ c.g.top.priority_label.split()[0] }}">{{ c.g.top.priority_label }}</span>
+    <div><strong>{{ c.g.title }}</strong><br><span class="muted small">{{ c.g.count }} occurrence{{ '' if c.g.count == 1 else 's' }} · score {{ c.g.top.priority_score }}</span></div></div>
+  {% endfor %}
+</div>
+
+{% for c in cards %}
+<div class="card sec">
+  <div class="card-head">
+    <h2>{{ c.g.title }}</h2>
+    <span class="pill {{ c.g.top.priority_label.split()[0] }}" style="margin-left:auto">{{ c.g.top.priority_label }}</span>
+  </div>
+  <p class="muted small" style="margin:0 0 8px">{{ c.g.count }} occurrence{{ '' if c.g.count == 1 else 's' }}
+    {% if c.g.cwe %}· CWE-{{ c.g.cwe }}{% endif %} · score {{ c.g.top.priority_score }}/100 · scanner risk {{ c.g.top.risk }}</p>
+  {% if c.a %}
+    <span class="source {{ c.a.source }}">{{ 'Local AI · ' ~ c.a.model ~ ' · checked against scan data' if c.a.source == 'ollama' else 'Knowledge-base explanation' }}</span>
+    <h4>What it means</h4><p>{{ c.a.explanation }}</p>
+    <h4>Possible impact</h4><p>{{ c.a.impact }}</p>
+    <h4>Suggested remediation</h4><p>{{ c.a.remediation }}</p>
+    {% if c.a.note %}<p class="small muted" style="margin-top:12px">{{ c.a.note }}</p>{% endif %}
+  {% else %}
+    <p class="muted">No analysis yet. Click <em>Refresh analysis</em>.</p>
+  {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="card empty">This assessment has no findings to analyse.</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if prog and prog.running %}<script>setTimeout(() => location.reload(), 4000);</script>{% endif %}
+{% endblock %}

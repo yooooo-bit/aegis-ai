@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Reports · AEGIS AI{% endblock %}
+{% block page_title %}Reports{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>Reports</h1>
+    <p class="muted" style="margin:0">Professional assessment reports with executive summary, scope, findings, remediation and retest results</p>
+  </div>
+</div>
+{% if not pdf_ok %}
+<div class="notice">PDF download needs one extra package. In your terminal run <code>pip install reportlab</code>, then restart the app. Until then use <strong>Print / Save as PDF</strong> inside the report.</div>
+{% endif %}
+<div class="card">
+  <table>
+    <tr><th>Assessment</th><th>Target</th><th>Mode</th><th>Findings</th><th class="hide-sm">Date (UTC)</th><th>Report</th></tr>
+    {% for s in scans %}
+    <tr>
+      <td><a href="{{ url_for('main.scan_detail', scan_id=s.id) }}">#{{ s.id }}</a></td>
+      <td>{{ s.target }}</td><td>{{ s.mode }}</td><td>{{ s.finding_count }}</td>
+      <td class="hide-sm muted">{{ s.started_at.replace('T', ' ')[:19] }}</td>
+      <td><a href="{{ url_for('main.report_view', scan_id=s.id) }}">View</a>
+        {% if pdf_ok %} · <a href="{{ url_for('main.report_pdf', scan_id=s.id) }}">PDF</a>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="empty">No completed assessments yet. Reports appear here after a scan finishes.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security Assessment Report · #{{ report.scan.id }}</title>
+{% set pc = {'Critical':'#d03b3b','High':'#ec835a','Medium':'#fab219','Low':'#0ca30c','Requires verification':'#9085e9'} %}
+<style>
+  :root { color-scheme:light; --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --accent:#2f5fe0; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#eef0f4; color:var(--ink); font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; line-height:1.55; }
+  .toolbar { position:sticky; top:0; z-index:5; display:flex; gap:10px; align-items:center; padding:10px 24px; background:#111827; color:#fff; }
+  .toolbar a, .toolbar button { color:#fff; text-decoration:none; font-size:.9rem; padding:7px 14px; border-radius:8px; border:1px solid #374151; background:transparent; cursor:pointer; box-shadow:none; }
+  .toolbar .primary { background:var(--accent); border-color:var(--accent); font-weight:600; }
+  .toolbar .grow { margin-left:auto; color:#9ca3af; font-size:.82rem; }
+  .page { max-width:900px; margin:24px auto 60px; background:#fff; padding:56px 64px; box-shadow:0 10px 40px rgba(0,0,0,.12); }
+  h1 { font-size:2rem; margin:0 0 4px; letter-spacing:-.02em; }
+  h2 { font-size:1.15rem; color:var(--accent); margin:34px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  h3 { font-size:1rem; margin:0; }
+  .target { color:var(--muted); margin:0 0 20px; font-size:1.05rem; }
+  .meta { display:grid; grid-template-columns:repeat(2,1fr); gap:0 28px; border-top:3px solid var(--accent); border-bottom:1px solid var(--line); padding:10px 0; }
+  .meta div { padding:5px 0; font-size:.92rem; } .meta b { display:inline-block; width:120px; color:var(--muted); font-size:.74rem; letter-spacing:.06em; text-transform:uppercase; }
+  .counts { display:grid; grid-template-columns:repeat(5,1fr); border:1px solid var(--line); margin-top:14px; }
+  .counts div { padding:10px 12px; border-left:1px solid var(--line); border-top:3px solid var(--c); } .counts div:first-child { border-left:0; }
+  .counts b { display:block; font-size:1.6rem; line-height:1.2; } .counts span { color:var(--muted); font-size:.7rem; letter-spacing:.05em; text-transform:uppercase; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  th { text-align:left; background:#f3f4f6; color:var(--muted); font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; padding:7px 10px; }
+  td { padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:99px; font-size:.75rem; font-weight:700; color:#fff; white-space:nowrap; }
+  .pill.dark { color:#111827; }
+  .issue { margin:18px 0 26px; break-inside:avoid; }
+  .issue header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  .issue dl { margin:10px 0 0; display:grid; grid-template-columns:150px 1fr; gap:6px 14px; font-size:.9rem; }
+  .issue dt { color:var(--muted); font-size:.72rem; letter-spacing:.05em; text-transform:uppercase; padding-top:3px; }
+  .issue dd { margin:0; word-break:break-word; }
+  .tag { display:inline-block; font-size:.72rem; font-weight:600; padding:1px 8px; border-radius:99px; border:1px solid var(--line); color:var(--muted); margin-left:6px; text-transform:none; letter-spacing:0; }
+  .muted { color:var(--muted); } code { background:#f3f4f6; padding:1px 5px; border-radius:4px; font-size:.85em; }
+  ul { margin:6px 0; padding-left:20px; }
+  footer { margin-top:40px; padding-top:10px; border-top:1px solid var(--line); color:var(--muted); font-size:.78rem; }
+  @media (max-width:760px) { .page { padding:28px 20px; } .meta, .counts { grid-template-columns:1fr; } .issue dl { grid-template-columns:1fr; } }
+  @media print {
+    body { background:#fff; } .toolbar { display:none; }
+    .page { box-shadow:none; margin:0; padding:0; max-width:none; }
+    .pill { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .counts div { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    h2 { break-after:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <a href="{{ url_for('main.scan_detail', scan_id=report.scan.id) }}">&larr; Back</a>
+  {% if pdf_ok %}<a class="primary" href="{{ url_for('main.report_pdf', scan_id=report.scan.id) }}">Download PDF</a>{% endif %}
+  <button class="{{ '' if pdf_ok else 'primary' }}" onclick="window.print()">Print / Save as PDF</button>
+  <span class="grow">Generated {{ report.generated }}</span>
+</div>
+
+<article class="page">
+  <h1>Security Assessment Report</h1>
+  <p class="target">{{ report.scan.target }}</p>
+  <div class="meta">
+    <div><b>Assessment</b>#{{ report.scan.id }} ({{ report.scan.mode }} scan)</div>
+    <div><b>Date</b>{{ report.started }} UTC</div>
+    <div><b>Prepared by</b>{{ report.tester or '-' }}</div>
+    <div><b>Organisation</b>{{ report.org or '-' }}</div>
+    <div><b>Generated</b>{{ report.generated }}</div>
+    <div><b>Tool</b>AEGIS AI with OWASP ZAP</div>
+  </div>
+
+  <h2>1. Executive summary</h2>
+  <p>{{ report.summary }}</p>
+  <div class="counts">
+    {% for label, n, color in report.counts %}<div style="--c:{{ color }}"><b>{{ n }}</b><span>{{ label }}</span></div>{% endfor %}
+  </div>
+
+  <h2>2. Scope and methodology</h2>
+  <p><strong>Target:</strong> {{ report.scan.target }}<br>
+     <strong>Authorized targets configured in AEGIS AI:</strong> {{ report.allowed|join(', ') }}<br>
+     <strong>Scan type:</strong> {{ report.scan.mode }} &middot; <strong>Duration:</strong> {{ report.duration or 'n/a' }}</p>
+  <p>The target was loaded and crawled with the OWASP ZAP spider and ZAP's passive scanner analysed every response{% if report.scan.mode == 'active' %}; the active scanner then sent test requests to the target{% endif %}.
+     AEGIS AI normalised the findings, grouped related ones, and prioritised them using scanner severity, exposure, confidentiality/integrity/availability impact and fix availability.</p>
+
+  <h2>3. Findings summary</h2>
+  <table>
+    <tr><th>#</th><th>Issue</th><th>Priority</th><th>Count</th><th>CWE</th></tr>
+    {% for it in report.issues %}
+    <tr><td>{{ it.n }}</td><td>{{ it.title }}</td>
+      <td><span class="pill {{ 'dark' if it.priority == 'Medium' }}" style="background:{{ pc[it.priority] }}">{{ 'Needs verification' if it.priority.startswith('Requires') else it.priority }}</span></td>
+      <td>{{ it.count }}</td><td>{{ 'CWE-' ~ it.cwe if it.cwe else '-' }}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">No findings were reported.</td></tr>{% endfor %}
+  </table>
+
+  <h2>4. Detailed findings</h2>
+  {% for it in report.issues %}
+  <section class="issue">
+    <header><h3>{{ it.n }}. {{ it.title }}</h3>
+      <span class="pill {{ 'dark' if it.priority == 'Medium' }}" style="background:{{ pc[it.priority] }}">{{ 'Needs verification' if it.priority.startswith('Requires') else it.priority }}</span></header>
+    <dl>
+      <dt>Priority</dt><dd>{{ it.priority }} (score {{ it.score }}/100). Scanner risk: {{ it.risk }}, confidence: {{ it.confidence }}.</dd>
+      <dt>Occurrences</dt><dd>{{ it.count }} at: {{ it.locations|join(', ') }}{% if it.more_locations %} and {{ it.more_locations }} more{% endif %}</dd>
+      <dt>CWE</dt><dd>{{ 'CWE-' ~ it.cwe if it.cwe else 'Not provided' }}</dd>
+      <dt>Scanner description</dt><dd>{{ it.description or '-' }}</dd>
+      {% if it.evidence %}<dt>Evidence</dt><dd><code>{{ it.evidence }}</code></dd>{% endif %}
+      {% if it.analysis %}
+        {% set a = it.analysis %}
+        <dt>Explanation</dt><dd>{{ a.explanation }}
+          <span class="tag">{{ 'AI-assisted (' ~ a.model ~ '), checked against scan data' if a.source == 'ollama' else 'Knowledge-base explanation' }}</span></dd>
+        <dt>Possible impact</dt><dd>{{ a.impact }}</dd>
+        <dt>Remediation</dt><dd>{{ a.remediation }}</dd>
+      {% elif it.scanner_solution %}
+        <dt>Remediation</dt><dd>{{ it.scanner_solution }}</dd>
+      {% endif %}
+    </dl>
+  </section>
+  {% endfor %}
+
+  <h2>5. Retest results</h2>
+  {% if report.retest %}
+    {% set rt = report.retest %}
+    <p>Compared with assessment #{{ rt.previous_id }} of the same target ({{ rt.previous_date }}):
+       <strong>{{ rt.fixed }}</strong> issue(s) no longer reported, <strong>{{ rt.new }}</strong> new, <strong>{{ rt.persisting }}</strong> still present.
+       Matching uses the finding name, component and parameter.</p>
+    {% if rt.fixed_titles %}<p class="muted">No longer reported: {{ rt.fixed_titles|join('; ') }}</p>{% endif %}
+    {% if rt.new_titles %}<p class="muted">Newly reported: {{ rt.new_titles|join('; ') }}</p>{% endif %}
+  {% else %}
+    <p>No earlier completed assessment of this target exists yet. Run another assessment after remediation to see fixed, new and persisting findings here.</p>
+  {% endif %}
+
+  <h2>6. Limitations</h2>
+  <ul>{% for text in report.limitations %}<li>{{ text }}</li>{% endfor %}</ul>
+
+  <h2>Appendix A. Evidence integrity</h2>
+  <p>{{ report.hashed }} of {{ report.total }} findings carry a SHA-256 evidence hash taken when they were stored. The scan audit log hash chain was
+     <strong>{{ 'verified intact' if report.chain_ok else 'NOT intact (entries were modified)' }}</strong> when this report was generated.</p>
+
+  <footer>AEGIS AI &middot; Security Assessment Report &middot; Confidential</footer>
+</article>
+</body>
+</html>

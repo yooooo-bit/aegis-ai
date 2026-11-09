@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Assessments · AEGIS AI{% endblock %}
+{% block page_title %}Assessments{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>Assessments</h1>
+    <p class="muted" style="margin:0">Start a scope-restricted scan and review past results</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>New assessment</h2></div>
+  <p class="card-sub">Only targets listed in <code>ALLOWED_TARGETS</code> (config.py) are accepted. Every action is written to the audit log.</p>
+  <form method="post" action="{{ url_for('main.start_scan') }}" autocomplete="off">
+    <input type="text" name="target" value="http://localhost:3000" placeholder="http://localhost:3000">
+    <label class="muted small" for="mode" style="display:block; margin:14px 0 6px">Scan type</label>
+    <select name="mode" id="mode">
+      <option value="passive" selected>Passive (recommended): observes traffic only, faster</option>
+      <option value="active">Active: sends attack-style test requests, slower (lab targets only)</option>
+    </select>
+    <label class="check"><input type="checkbox" name="confirm">
+      <span>I own this target or have written authorization to test it</span></label>
+    <button type="submit">Start assessment</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Assessment history</h2></div>
+  <table>
+    <tr><th>#</th><th>Target</th><th>Mode</th><th>Status</th><th>Findings</th><th class="hide-sm">Started (UTC)</th></tr>
+    {% for s in scans %}
+    <tr>
+      <td><a href="{{ url_for('main.scan_detail', scan_id=s.id) }}">#{{ s.id }}</a></td>
+      <td>{{ s.target }}</td><td>{{ s.mode }}</td>
+      <td><span class="badge {{ s.status }}"><span class="dot"></span>{{ s.status }}</span></td>
+      <td>{{ s.finding_count }}</td>
+      <td class="hide-sm muted">{{ s.started_at.replace('T', ' ')[:19] }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="empty">No assessments yet. Start one above.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

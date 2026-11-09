@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Audit log · AEGIS AI{% endblock %}
+{% block page_title %}Audit log{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>Audit log</h1>
+    <p class="muted" style="margin:0">Every scan action, chained with SHA-256 hashes so edits can be detected</p>
+  </div>
+  <span class="badge {{ 'completed' if intact else 'failed' }}"><span class="dot"></span>Chain {{ 'intact' if intact else 'BROKEN: entries were modified' }}</span>
+</div>
+<div class="card">
+  <table>
+    <tr><th>Time (UTC)</th><th>Action</th><th>Target</th><th>Detail</th><th>Hash</th></tr>
+    {% for e in entries %}
+    <tr><td class="muted">{{ e.ts.replace('T', ' ')[:19] }}</td><td>{{ e.action }}</td><td>{{ e.target }}</td><td>{{ e.detail }}</td>
+        <td class="muted"><code>{{ e.entry_hash[:12] }}</code></td></tr>
+    {% else %}
+    <tr><td colspan="5" class="empty">No entries yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Evidence · AEGIS AI{% endblock %}
+{% block page_title %}Evidence{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <h1>Forensic evidence</h1>
+    <p class="muted" style="margin:0">Export a tamper-evident evidence bundle for an assessment, and verify bundles later</p>
+  </div>
+</div>
+
+<div class="notice"><strong>What is in a bundle?</strong> The findings (JSON and CSV), a timeline, the full audit-log hash chain, a manifest with the SHA-256 of every file,
+  a chain-of-custody record, and a standalone <code>verify_bundle.py</code> checker. The manifest hash is also written into this installation's audit log, so a bundle edited after export can be recognised.</div>
+
+{% if result %}
+<div class="card">
+  <div class="card-head"><h2>Verification result</h2>
+    <span class="chip" style="{{ 'background:rgba(12,163,12,.15);color:#34d399;border-color:#1f5a46' if result.ok else 'background:rgba(208,59,59,.15);color:#ff7b7b;border-color:#6a2a33' }}">
+      {{ 'ALL CHECKS PASSED' if result.ok else 'VERIFICATION FAILED' }}</span></div>
+  {% if result.scan %}<p class="card-sub">Assessment #{{ result.scan.id }} · {{ result.scan.target }}</p>{% else %}<p class="card-sub">&nbsp;</p>{% endif %}
+  {% for c in result.checks %}
+  <div class="check-row"><span class="st {{ c.status }}">{{ c.status }}</span>
+    <div><strong>{{ c.name }}</strong>{% if c.detail %}<br><span class="muted small">{{ c.detail }}</span>{% endif %}</div></div>
+  {% endfor %}
+  {% if result.manifest_sha256 %}<p class="small muted" style="margin:14px 0 0">Manifest SHA-256<br><span class="hash">{{ result.manifest_sha256 }}</span></p>{% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>Export evidence</h2></div>
+  <p class="card-sub">Each export is recorded in the audit log. Set your name under Settings so it appears as the examiner.</p>
+  <table>
+    <tr><th>Assessment</th><th>Target</th><th>Mode</th><th>Findings</th><th class="hide-sm">Date (UTC)</th><th>Bundle</th></tr>
+    {% for s in scans %}
+    <tr>
+      <td><a href="{{ url_for('main.scan_detail', scan_id=s.id) }}">#{{ s.id }}</a></td>
+      <td>{{ s.target }}</td><td>{{ s.mode }}</td><td>{{ s.finding_count }}</td>
+      <td class="hide-sm muted">{{ s.started_at.replace('T', ' ')[:19] }}</td>
+      <td><a class="btn" style="padding:5px 14px; font-size:.82rem" href="{{ url_for('main.evidence_download', scan_id=s.id) }}">Download .zip</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="empty">No completed assessments yet. Evidence can be exported after a scan finishes.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Verify a bundle</h2></div>
+  <p class="card-sub">Upload a bundle you exported earlier. Nothing is extracted to disk; the checks run in memory.</p>
+  <form method="post" action="{{ url_for('main.evidence_verify') }}" enctype="multipart/form-data" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center">
+    <input type="file" name="bundle" accept=".zip,application/zip">
+    <button type="submit">Verify bundle</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Export history</h2><span class="chip">from the audit log</span></div>
+  <p class="card-sub">Compare these manifest hashes with the one printed by <code>verify_bundle.py</code>.</p>
+  {% for e in exports %}
+  <div class="check-row"><div>
+    <strong>{{ e.ts.replace('T', ' ')[:19] }} UTC</strong> <span class="muted small">· {{ e.target }}</span><br>
+    <span class="hash">{{ e.detail }}</span></div></div>
+  {% else %}
+  <p class="muted" style="margin:0">No bundles exported yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

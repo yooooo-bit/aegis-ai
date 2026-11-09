@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}3D attack surface · Scan #{{ scan.id }}{% endblock %}
+{% block page_title %}Attack surface{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('main.assessments') }}">Assessments</a> /
+  <a href="{{ url_for('main.scan_detail', scan_id=scan.id) }}">Assessment #{{ scan.id }}</a> / 3D attack surface</div>
+<h1>3D attack surface</h1>
+<p class="muted">Blue core = target. Spheres around it = discovered components (URL paths). Outer spheres = finding types shared between components.
+  Color shows the highest priority. Drag to rotate, scroll to zoom, click a sphere for details.</p>
+
+<div class="card" style="padding:0; position:relative; overflow:hidden">
+  <div id="graph" style="height:640px"></div>
+  <div id="info" class="glass-panel">
+    <h4>Select a sphere</h4>
+    <p class="muted small">Click any node to see what it is and how to fix it.</p>
+  </div>
+  <div class="glass-panel legend3d">
+    <span><i style="background:#4f8cff"></i>Target</span>
+    <span><i style="background:#d03b3b"></i>Critical</span>
+    <span><i style="background:#ec835a"></i>High</span>
+    <span><i style="background:#fab219"></i>Medium</span>
+    <span><i style="background:#0ca30c"></i>Low</span>
+    <span><i style="background:#9085e9"></i>Verify</span>
+  </div>
+  <div id="status" class="empty" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center">Loading 3D scene…</div>
+</div>
+<p class="muted small" id="meta"></p>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/3d-force-graph"></script>
+<script>
+(async function () {
+  const status = document.getElementById('status'), info = document.getElementById('info');
+  try {
+    if (typeof ForceGraph3D === 'undefined') throw new Error('The 3D library could not be loaded. Check your internet connection and refresh.');
+    const data = await (await fetch("{{ url_for('main.graph_json', scan_id=scan.id) }}")).json();
+    if (data.nodes.length <= 1) { status.textContent = 'No findings yet, so there is nothing to draw.'; return; }
+
+    const el = document.getElementById('graph');
+    const Graph = ForceGraph3D({ controlType: 'orbit' })(el)
+      .graphData(data)
+      .backgroundColor('#0b1020')
+      .nodeLabel(n => n.label)
+      .nodeColor(n => n.color)
+      .nodeVal(n => n.val)
+      .nodeOpacity(0.95)
+      .nodeResolution(20)
+      .linkColor(() => 'rgba(150,170,210,0.35)')
+      .linkWidth(0.6)
+      .linkDirectionalParticles(1)
+      .linkDirectionalParticleWidth(1.4)
+      .onNodeClick(n => {
+        info.innerHTML = '';
+        const h = document.createElement('h4'); h.textContent = n.label;
+        const p = document.createElement('p'); p.className = 'small'; p.textContent = n.detail;
+        info.append(h, p);
+        const d = 90 + n.val * 4, r = 1 + d / Math.hypot(n.x || 1, n.y || 1, n.z || 1);
+        Graph.cameraPosition({ x: n.x * r, y: n.y * r, z: n.z * r }, n, 900);
+        Graph.controls().autoRotate = false;
+      });
+
+    Graph.controls().autoRotate = true;
+    Graph.controls().autoRotateSpeed = 0.6;
+    Graph.d3Force('charge').strength(-90);
+    status.remove();
+    const resize = () => Graph.width(el.clientWidth).height(el.clientHeight);
+    window.addEventListener('resize', resize); resize();
+
+    const m = data.meta;
+    document.getElementById('meta').textContent =
+      'Showing ' + m.components_shown + ' of ' + m.components_total + ' components (most serious first) and ' + m.finding_types + ' finding types.';
+  } catch (err) {
+    status.textContent = err.message || 'Your browser could not start the 3D scene (WebGL may be disabled).';
+  }
+})();
+</script>
+{% endblock %}

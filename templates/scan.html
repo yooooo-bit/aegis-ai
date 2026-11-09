@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Scan #{{ scan.id }} · AEGIS AI{% endblock %}
+{% block page_title %}Assessment #{{ scan.id }}{% endblock %}
+{% block content %}
+{% set colors = {'Critical':'var(--crit)','High':'var(--high)','Medium':'var(--med)','Low':'var(--low)','Requires verification':'var(--ver)'} %}
+
+<div class="crumbs"><a href="{{ url_for('main.assessments') }}">Assessments</a> / #{{ scan.id }}</div>
+<h1>{{ scan.target }}</h1>
+<p class="muted">
+  <span class="badge {{ scan.status }}"><span class="dot"></span>{{ scan.status }}</span>
+  &nbsp;{{ scan.mode }} scan · started {{ scan.started_at.replace('T',' ')[:19] }} UTC
+  {% if duration %}· took {{ duration }}{% endif %}
+  · <a href="{{ url_for('main.surface', scan_id=scan.id) }}"><strong>3D attack surface</strong></a>
+  {% if scan.status == 'completed' %}
+  · <a href="{{ url_for('main.analysis', scan_id=scan.id) }}"><strong>AI analysis</strong></a>
+  · <a href="{{ url_for('main.report_view', scan_id=scan.id) }}"><strong>Report</strong></a>
+  · <a href="{{ url_for('main.evidence_download', scan_id=scan.id) }}"><strong>Evidence bundle</strong></a>
+  {% endif %}
+  · <a href="{{ url_for('main.scan_json', scan_id=scan.id) }}">JSON</a>
+</p>
+{% if scan.error %}<div class="flash-error"><strong>Scan failed:</strong> {{ scan.error }}</div>{% endif %}
+
+<div class="grid">
+  <div class="stat"><div class="n">{{ summary.total }}</div><div class="l">Total findings</div></div>
+  {% for label, n in summary.counts %}
+  <div class="stat {{ label.split()[0] }}"><div class="n">{{ n }}</div><div class="l">{{ 'Needs verification' if label.startswith('Requires') else label }}</div></div>
+  {% endfor %}
+</div>
+
+{% if summary.total %}
+<div class="card">
+  <h2>Priority distribution</h2>
+  <div class="bar">
+    {% for label, n in summary.counts if n %}
+    <span style="width:{{ (n / summary.total * 100)|round(1) }}%; background:{{ colors[label] }}" title="{{ label }}: {{ n }}"></span>
+    {% endfor %}
+  </div>
+  <div class="legend">
+    {% for label, n in summary.counts %}<span><i style="background:{{ colors[label] }}"></i>{{ label }} ({{ n }})</span>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Findings <span class="muted small" id="shown"></span></h2>
+  <p class="muted small">Scanner output from OWASP ZAP, not confirmed exploits. Findings marked <em>Requires verification</em> need manual confirmation. Click a row for details.</p>
+  <div class="filters">
+    <input type="text" id="q" placeholder="Search by title, URL or CWE…">
+    <select id="prio">
+      <option value="">All priorities</option>
+      {% for label, n in summary.counts %}<option value="{{ label }}">{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <table>
+    <tr><th>Priority</th><th>Score</th><th>Finding</th><th class="hide-sm">ZAP risk</th><th class="hide-sm">Location</th></tr>
+    {% for f in findings %}
+    <tr class="frow" data-priority="{{ f.priority_label }}" data-search="{{ (f.title ~ ' ' ~ f.url ~ ' cwe-' ~ f.cwe)|lower }}">
+      <td><span class="pill {{ f.priority_label.split()[0] }}">{{ f.priority_label }}</span></td>
+      <td><strong>{{ f.priority_score }}</strong></td>
+      <td>{{ f.title }}<br><span class="muted small">CWE-{{ f.cwe }} · confidence {{ f.confidence }}</span></td>
+      <td class="hide-sm">{{ f.risk }}</td>
+      <td class="hide-sm small" style="word-break:break-all">{{ f.url }}{% if f.param %}<br><span class="muted">param: {{ f.param }}</span>{% endif %}</td>
+    </tr>
+    <tr class="fdetail" style="display:none"><td colspan="5">
+      <div class="detail-grid">
+        <div><h4>What it means</h4><p>{{ (f.description or '—')|striptags }}</p></div>
+        <div><h4>Suggested fix</h4><p>{{ (f.solution or 'No fix guidance provided by the scanner.')|striptags }}</p></div>
+        <div><h4>Evidence</h4><p>{% if f.evidence %}<code>{{ f.evidence[:300] }}</code>{% else %}None recorded{% endif %}</p></div>
+        <div><h4>Reference</h4><p>
+          {% if f.cwe and f.cwe not in ('0', '-1') %}<a href="https://cwe.mitre.org/data/definitions/{{ f.cwe }}.html" target="_blank" rel="noopener">CWE-{{ f.cwe }}</a> · {% endif %}
+          ZAP plugin {{ f.plugin_id }} · evidence hash <code>{{ f.evidence_hash[:16] }}</code></p></div>
+      </div>
+    </td></tr>
+    {% else %}
+    <tr><td colspan="5" class="empty">
+      {% if scan.status == 'running' %}Assessment in progress. This page updates automatically.
+      {% elif scan.status == 'failed' %}No findings, the scan did not complete.
+      {% else %}No findings were reported.{% endif %}
+    </td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const q = document.getElementById('q'), sel = document.getElementById('prio'), shown = document.getElementById('shown');
+  const rows = Array.from(document.querySelectorAll('tr.frow'));
+  function apply() {
+    const t = q.value.trim().toLowerCase(), p = sel.value;
+    let n = 0;
+    rows.forEach(r => {
+      const ok = (!p || r.dataset.priority === p) && (!t || r.dataset.search.includes(t));
+      r.style.display = ok ? '' : 'none';
+      r.nextElementSibling.style.display = (ok && r.classList.contains('open')) ? 'table-row' : 'none';
+      if (ok) n++;
+    });
+    if (rows.length) shown.textContent = '(showing ' + n + ' of ' + rows.length + ')';
+  }
+  rows.forEach(r => r.addEventListener('click', () => {
+    r.classList.toggle('open');
+    r.nextElementSibling.style.display = r.classList.contains('open') ? 'table-row' : 'none';
+  }));
+  q.addEventListener('input', apply); sel.addEventListener('change', apply); apply();
+  {% if scan.status == 'running' %}setTimeout(() => location.reload(), 5000);{% endif %}
+</script>
+{% endblock %}
